@@ -8,9 +8,9 @@ filters:
   tag:role: web
   instance-state-name: running
 keyed_groups:
-  - key: tags.environment
+  - key: ec2_tags.environment
     prefix: env
-  - key: tags.service
+  - key: ec2_tags.service
     prefix: service
 hostnames:
   - instance-id
