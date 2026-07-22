@@ -49,6 +49,10 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Install Terraform backend config
+        working-directory: terraform
+        run: cp backend.tf.example backend.tf
+
       - name: Terraform fmt
         working-directory: terraform
         run: terraform fmt -check -recursive
@@ -102,6 +106,10 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Install Terraform backend config
+        working-directory: terraform
+        run: cp backend.tf.example backend.tf
+
       - name: Terraform init
         working-directory: terraform
         run: terraform init
@@ -135,6 +143,10 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+
+      - name: Install Terraform backend config
+        working-directory: terraform
+        run: cp backend.tf.example backend.tf
 
       - name: Terraform init
         working-directory: terraform
