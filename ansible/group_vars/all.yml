@@ -1,0 +1,8 @@
+---
+service_name: rewards
+service_user: rewards
+app_dir: /opt/rewards
+app_port: 8080
+app_secret_parameter_name: /rewards/dev/APP_SECRET
+commit_sha: "{{ lookup('env', 'GITHUB_SHA') | default('', true) }}"
+aws_region: "{{ lookup('env', 'AWS_REGION') | default('af-south-1', true) }}"

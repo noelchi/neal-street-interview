@@ -1,0 +1,23 @@
+[Unit]
+Description=Rewards health service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ service_user }}
+Group={{ service_user }}
+WorkingDirectory={{ app_dir }}
+EnvironmentFile=/etc/rewards.env
+ExecStart=/usr/bin/python3 {{ app_dir }}/rewards_app.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ app_dir }}
+
+[Install]
+WantedBy=multi-user.target
+

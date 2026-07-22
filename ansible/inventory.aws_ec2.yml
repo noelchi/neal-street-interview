@@ -1,0 +1,21 @@
+---
+plugin: amazon.aws.aws_ec2
+regions:
+  - "{{ lookup('env', 'AWS_REGION') | default('af-south-1', true) }}"
+filters:
+  tag:service: rewards
+  tag:environment: dev
+  tag:role: web
+  instance-state-name: running
+keyed_groups:
+  - key: tags.environment
+    prefix: env
+  - key: tags.service
+    prefix: service
+hostnames:
+  - instance-id
+compose:
+  ansible_host: instance_id
+  ansible_connection: "'amazon.aws.aws_ssm'"
+  ansible_aws_ssm_region: placement.region
+  ansible_aws_ssm_bucket_name: lookup('env', 'ANSIBLE_AWS_SSM_BUCKET_NAME')

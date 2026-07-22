@@ -1,0 +1,102 @@
+---
+- name: Configure rewards web tier
+  hosts: service_rewards
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Read application secret from SSM Parameter Store
+      ansible.builtin.set_fact:
+        app_secret: "{{ lookup('amazon.aws.ssm_parameter', app_secret_parameter_name, decrypt=true, region=aws_region) }}"
+      no_log: true
+
+  tasks:
+    - name: Ensure service group exists
+      ansible.builtin.group:
+        name: "{{ service_user }}"
+        system: true
+
+    - name: Ensure service user exists
+      ansible.builtin.user:
+        name: "{{ service_user }}"
+        group: "{{ service_user }}"
+        system: true
+        shell: /sbin/nologin
+        home: "{{ app_dir }}"
+        create_home: false
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0750"
+
+    - name: Install rewards application
+      ansible.builtin.copy:
+        src: ../files/rewards_app.py
+        dest: "{{ app_dir }}/rewards_app.py"
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0750"
+      notify: Restart rewards
+
+    - name: Write systemd environment file
+      ansible.builtin.copy:
+        dest: /etc/rewards.env
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          SERVICE_NAME={{ service_name }}
+          APP_PORT={{ app_port }}
+          APP_SECRET={{ app_secret }}
+          COMMIT_SHA={{ commit_sha }}
+          AWS_REGION={{ aws_region }}
+      no_log: true
+      notify: Restart rewards
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: ../templates/rewards.service.j2
+        dest: /etc/systemd/system/rewards.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart rewards
+
+    - name: Apply basic kernel network hardening
+      ansible.posix.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: true
+        sysctl_set: true
+      loop:
+        - { name: net.ipv4.conf.all.accept_redirects, value: "0" }
+        - { name: net.ipv4.conf.default.accept_redirects, value: "0" }
+        - { name: net.ipv4.conf.all.send_redirects, value: "0" }
+        - { name: net.ipv4.conf.default.send_redirects, value: "0" }
+        - { name: net.ipv4.conf.all.rp_filter, value: "1" }
+        - { name: net.ipv4.conf.default.rp_filter, value: "1" }
+
+    - name: Ensure rewards service is enabled and running
+      ansible.builtin.systemd:
+        name: rewards
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart rewards
+      ansible.builtin.systemd:
+        name: rewards
+        state: restarted
+

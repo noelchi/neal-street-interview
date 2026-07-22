@@ -1,0 +1,9 @@
+aws_region                = "af-south-1"
+environment               = "dev"
+service                   = "rewards"
+owner                     = "candidate"
+cost_center               = "payments"
+desired_capacity          = 1
+min_size                  = 1
+max_size                  = 2
+app_secret_parameter_name = "/rewards/dev/APP_SECRET"

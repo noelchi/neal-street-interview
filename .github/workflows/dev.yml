@@ -1,0 +1,111 @@
+name: dev
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'af-south-1' }}
+  TF_IN_AUTOMATION: true
+
+jobs:
+  plan:
+    name: Plan dev
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: terraform
+        run: terraform plan -var-file=dev.tfvars.example -out=dev.tfplan
+
+      - name: Install Ansible
+        run: python -m pip install --upgrade ansible boto3 botocore
+
+      - name: Install Ansible collections
+        working-directory: ansible
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Ansible syntax check
+        working-directory: ansible
+        run: ansible-playbook --syntax-check -i localhost, playbooks/site.yml
+
+  deploy-dev:
+    name: Deploy dev
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    concurrency:
+      group: rewards-dev
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform apply dev
+        working-directory: terraform
+        run: terraform apply -auto-approve -var-file=dev.tfvars.example
+
+      - name: Capture Ansible SSM bucket
+        id: tf-output
+        working-directory: terraform
+        run: echo "bucket=$(terraform output -raw ansible_ssm_bucket_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ansible
+        run: python -m pip install --upgrade ansible boto3 botocore
+
+      - name: Install Ansible collections
+        working-directory: ansible
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Configure instances
+        working-directory: ansible
+        env:
+          ANSIBLE_AWS_SSM_BUCKET_NAME: ${{ steps.tf-output.outputs.bucket }}
+        run: ansible-playbook -i inventory.aws_ec2.yml playbooks/site.yml
