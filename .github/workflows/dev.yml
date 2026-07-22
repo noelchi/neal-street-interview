@@ -13,6 +13,7 @@ on:
         type: choice
         options:
           - plan
+          - import-existing
           - apply
           - configure
 
@@ -117,6 +118,64 @@ jobs:
       - name: Terraform apply dev
         working-directory: terraform
         run: terraform apply -auto-approve -var-file=dev.tfvars.example
+
+  import-existing-dev:
+    name: Import existing dev resources
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.stage == 'import-existing'
+    concurrency:
+      group: rewards-dev-import
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check AWS role secret
+        env:
+          DEV_AWS_ROLE_ARN: ${{ secrets.DEV_AWS_ROLE_ARN }}
+        run: test -n "$DEV_AWS_ROLE_ARN"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Install Terraform backend config
+        working-directory: terraform
+        run: cp backend.tf.example backend.tf
+
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Import existing dev resources
+        working-directory: terraform
+        run: |
+          set -euo pipefail
+
+          import_if_missing() {
+            local address="$1"
+            local id="$2"
+
+            if terraform state show "$address" >/dev/null 2>&1; then
+              echo "$address already exists in Terraform state"
+            else
+              terraform import -var-file=dev.tfvars.example "$address" "$id"
+            fi
+          }
+
+          ALB_ARN="$(aws elbv2 describe-load-balancers --names rewards-dev --query 'LoadBalancers[0].LoadBalancerArn' --output text)"
+          TARGET_GROUP_ARN="$(aws elbv2 describe-target-groups --names rewards-dev --query 'TargetGroups[0].TargetGroupArn' --output text)"
+
+          import_if_missing aws_s3_bucket.ansible_ssm rewards-dev-ansible-ssm-487750847994-af-south-1
+          import_if_missing aws_iam_role.web rewards-dev-web
+          import_if_missing aws_lb.web "$ALB_ARN"
+          import_if_missing aws_lb_target_group.web "$TARGET_GROUP_ARN"
 
   configure-dev:
     name: Configure dev
