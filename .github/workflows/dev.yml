@@ -26,6 +26,7 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION || 'af-south-1' }}
   TF_IN_AUTOMATION: true
   TF_VERSION: 1.10.0
+  TF_VAR_app_secret_value: ${{ secrets.DEV_APP_SECRET }}
 
 jobs:
   plan:
@@ -41,6 +42,11 @@ jobs:
         env:
           DEV_AWS_ROLE_ARN: ${{ secrets.DEV_AWS_ROLE_ARN }}
         run: test -n "$DEV_AWS_ROLE_ARN"
+
+      - name: Check app secret
+        env:
+          DEV_APP_SECRET: ${{ secrets.DEV_APP_SECRET }}
+        run: test -n "$DEV_APP_SECRET"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -97,6 +103,11 @@ jobs:
           DEV_AWS_ROLE_ARN: ${{ secrets.DEV_AWS_ROLE_ARN }}
         run: test -n "$DEV_AWS_ROLE_ARN"
 
+      - name: Check app secret
+        env:
+          DEV_APP_SECRET: ${{ secrets.DEV_APP_SECRET }}
+        run: test -n "$DEV_APP_SECRET"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -132,6 +143,11 @@ jobs:
         env:
           DEV_AWS_ROLE_ARN: ${{ secrets.DEV_AWS_ROLE_ARN }}
         run: test -n "$DEV_AWS_ROLE_ARN"
+
+      - name: Check app secret
+        env:
+          DEV_APP_SECRET: ${{ secrets.DEV_APP_SECRET }}
+        run: test -n "$DEV_APP_SECRET"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -249,6 +265,7 @@ jobs:
           SSM_MESSAGES_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ssmmessages" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
           EC2_MESSAGES_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ec2messages" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
           S3_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.s3" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
+          APP_SECRET_PARAMETER_NAME="$(aws ssm describe-parameters --parameter-filters Key=Name,Option=Equals,Values=/rewards/dev/APP_SECRET --query 'Parameters[0].Name' --output text)"
           LISTENER_ARN="$(aws elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" --query 'Listeners[?Port==`80`].ListenerArn | [0]' --output text)"
           LAUNCH_TEMPLATE_ID="$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "${NAME}-web" --query 'AutoScalingGroups[0].LaunchTemplate.LaunchTemplateId' --output text)"
 
@@ -279,6 +296,7 @@ jobs:
           import_if_missing aws_iam_role_policy_attachment.ssm_managed_instance "${NAME}-web/${SSM_POLICY_ARN}"
           import_if_missing aws_iam_role_policy.app_secret "${NAME}-web:${NAME}-app-secret"
           import_if_missing aws_iam_instance_profile.web "${NAME}-web"
+          import_if_missing aws_ssm_parameter.app_secret "$APP_SECRET_PARAMETER_NAME"
           import_if_missing aws_lb.web "$ALB_ARN"
           import_if_missing aws_lb_target_group.web "$TARGET_GROUP_ARN"
           import_if_missing aws_lb_listener.http "$LISTENER_ARN"

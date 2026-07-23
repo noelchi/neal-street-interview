@@ -18,27 +18,22 @@ Ansible connects to the instances through AWS Systems Manager, so no SSH ingress
 
 ## Prerequisites
 
-- AWS account access with permission to create VPC, EC2, IAM, SSM, ALB, Auto Scaling, and CloudWatch resources.
+- AWS account access with permission to create VPC, EC2, IAM, SSM Parameter Store, ALB, Auto Scaling, and CloudWatch resources.
 - Terraform >= 1.10.
 - Python 3.11+.
 - Ansible with the `amazon.aws` collection.
 - AWS Session Manager plugin installed locally for Ansible SSM connections.
 - An S3 bucket for remote Terraform state, if using the team backend described in `SOLUTION.md`.
 
-## One-Time Secret Setup
+## Application Secret
 
-Create the application secret outside the repo:
+Terraform creates `/rewards/dev/APP_SECRET` as an SSM SecureString. Provide the value as a sensitive Terraform variable instead of committing it to a `.tfvars` file:
 
 ```bash
-aws ssm put-parameter \
-  --name /rewards/dev/APP_SECRET \
-  --type SecureString \
-  --value "replace-with-demo-secret" \
-  --overwrite \
-  --region af-south-1
+export TF_VAR_app_secret_value="$(openssl rand -base64 32)"
 ```
 
-The value is consumed by Ansible at deploy time and written into the systemd environment for the app. The health endpoint does not expose it.
+The value is consumed by Ansible at deploy time and written into the systemd environment for the app. The health endpoint does not expose it. Because Terraform manages the SecureString, the secret value is also stored in Terraform state; keep the state bucket access tightly restricted.
 
 ## Local Dev Deployment
 
@@ -47,6 +42,7 @@ From the repository root:
 ```bash
 cd terraform
 cp dev.tfvars.example dev.tfvars
+export TF_VAR_app_secret_value="$(openssl rand -base64 32)"
 terraform init
 terraform fmt -recursive
 terraform validate
@@ -88,11 +84,7 @@ cd terraform
 terraform destroy -var-file=dev.tfvars
 ```
 
-The SSM parameter was intentionally created outside Terraform. Delete it separately when the demo is complete:
-
-```bash
-aws ssm delete-parameter --name /rewards/dev/APP_SECRET --region af-south-1
-```
+Terraform manages the SSM parameter, so `terraform destroy` removes it during cleanup.
 
 ## CI/CD
 
@@ -100,6 +92,7 @@ The GitHub Actions workflow in `.github/workflows/dev.yml` expects:
 
 - `vars.AWS_REGION`, for example `af-south-1`.
 - `secrets.DEV_AWS_ROLE_ARN`, an IAM role GitHub can assume through OIDC.
+- `secrets.DEV_APP_SECRET`, the value Terraform writes to `/rewards/dev/APP_SECRET`.
 
 Pull requests run Terraform checks, initialize the checked-in S3 backend, produce a dev plan, and run Ansible syntax validation.
 
