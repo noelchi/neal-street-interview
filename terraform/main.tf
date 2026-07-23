@@ -31,17 +31,6 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-resource "aws_ssm_parameter" "app_secret" {
-  name        = var.app_secret_parameter_name
-  description = "APP_SECRET for the ${local.name} service."
-  type        = "SecureString"
-  value       = var.app_secret_value
-
-  tags = {
-    Name = "${local.name}-app-secret"
-  }
-}
-
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true

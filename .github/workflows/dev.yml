@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       stage:
@@ -26,7 +29,6 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION || 'af-south-1' }}
   TF_IN_AUTOMATION: true
   TF_VERSION: 1.10.0
-  TF_VAR_app_secret_value: ${{ secrets.DEV_APP_SECRET }}
 
 jobs:
   plan:
@@ -42,11 +44,6 @@ jobs:
         env:
           DEV_AWS_ROLE_ARN: ${{ secrets.DEV_AWS_ROLE_ARN }}
         run: test -n "$DEV_AWS_ROLE_ARN"
-
-      - name: Check app secret
-        env:
-          DEV_APP_SECRET: ${{ secrets.DEV_APP_SECRET }}
-        run: test -n "$DEV_APP_SECRET"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -73,7 +70,21 @@ jobs:
 
       - name: Terraform plan
         working-directory: terraform
-        run: terraform plan -input=false -no-color -var-file=dev.tfvars.example -out=dev.tfplan
+        run: |
+          set +e
+          terraform plan -input=false -no-color -var-file=dev.tfvars.example -out=dev.tfplan > dev.tfplan.txt
+          status=$?
+          cat dev.tfplan.txt
+
+          {
+            echo "### Terraform dev plan"
+            echo
+            echo '```'
+            sed -n '1,500p' dev.tfplan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$status"
 
       - name: Install Ansible
         run: python -m pip install --upgrade ansible boto3 botocore
@@ -89,7 +100,7 @@ jobs:
   apply-dev:
     name: Apply dev
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.stage == 'apply'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.stage == 'apply')
     concurrency:
       group: rewards-dev-apply
       cancel-in-progress: false
@@ -102,11 +113,6 @@ jobs:
         env:
           DEV_AWS_ROLE_ARN: ${{ secrets.DEV_AWS_ROLE_ARN }}
         run: test -n "$DEV_AWS_ROLE_ARN"
-
-      - name: Check app secret
-        env:
-          DEV_APP_SECRET: ${{ secrets.DEV_APP_SECRET }}
-        run: test -n "$DEV_APP_SECRET"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -143,11 +149,6 @@ jobs:
         env:
           DEV_AWS_ROLE_ARN: ${{ secrets.DEV_AWS_ROLE_ARN }}
         run: test -n "$DEV_AWS_ROLE_ARN"
-
-      - name: Check app secret
-        env:
-          DEV_APP_SECRET: ${{ secrets.DEV_APP_SECRET }}
-        run: test -n "$DEV_APP_SECRET"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -265,7 +266,6 @@ jobs:
           SSM_MESSAGES_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ssmmessages" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
           EC2_MESSAGES_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ec2messages" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
           S3_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.s3" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
-          APP_SECRET_PARAMETER_NAME="$(aws ssm describe-parameters --parameter-filters Key=Name,Option=Equals,Values=/rewards/dev/APP_SECRET --query 'Parameters[0].Name' --output text)"
           LISTENER_ARN="$(aws elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" --query 'Listeners[?Port==`80`].ListenerArn | [0]' --output text)"
           LAUNCH_TEMPLATE_ID="$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "${NAME}-web" --query 'AutoScalingGroups[0].LaunchTemplate.LaunchTemplateId' --output text)"
 
@@ -296,7 +296,6 @@ jobs:
           import_if_missing aws_iam_role_policy_attachment.ssm_managed_instance "${NAME}-web/${SSM_POLICY_ARN}"
           import_if_missing aws_iam_role_policy.app_secret "${NAME}-web:${NAME}-app-secret"
           import_if_missing aws_iam_instance_profile.web "${NAME}-web"
-          import_if_missing aws_ssm_parameter.app_secret "$APP_SECRET_PARAMETER_NAME"
           import_if_missing aws_lb.web "$ALB_ARN"
           import_if_missing aws_lb_target_group.web "$TARGET_GROUP_ARN"
           import_if_missing aws_lb_listener.http "$LISTENER_ARN"
@@ -308,7 +307,14 @@ jobs:
   configure-dev:
     name: Configure dev
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.stage == 'configure'
+    needs:
+      - apply-dev
+    if: >
+      always() &&
+      (
+        (github.event_name == 'push' && needs.apply-dev.result == 'success') ||
+        (github.event_name == 'workflow_dispatch' && inputs.stage == 'configure')
+      )
     concurrency:
       group: rewards-dev-configure
       cancel-in-progress: false
@@ -341,6 +347,21 @@ jobs:
         id: tf-output
         working-directory: terraform
         run: echo "bucket=$(terraform output -raw ansible_ssm_bucket_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Check application secret parameter
+        run: |
+          set -euo pipefail
+
+          PARAMETER_NAME="/rewards/dev/APP_SECRET"
+
+          if aws ssm get-parameter --name "$PARAMETER_NAME" --with-decryption --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "$PARAMETER_NAME exists"
+          else
+            echo "$PARAMETER_NAME is missing."
+            echo "Create it outside the repo before configuring dev:"
+            echo "aws ssm put-parameter --name $PARAMETER_NAME --type SecureString --value '<secret>' --overwrite --region $AWS_REGION"
+            exit 1
+          fi
 
       - name: Install Ansible
         run: python -m pip install --upgrade ansible boto3 botocore

@@ -82,17 +82,6 @@ variable "app_secret_parameter_name" {
   default     = "/rewards/dev/APP_SECRET"
 }
 
-variable "app_secret_value" {
-  description = "Value stored in the APP_SECRET SSM SecureString parameter. Pass through TF_VAR_app_secret_value or a secure CI secret."
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = length(var.app_secret_value) > 0
-    error_message = "app_secret_value must be a non-empty string."
-  }
-}
-
 variable "allowed_health_cidr_blocks" {
   description = "CIDR ranges allowed to call the public ALB."
   type        = list(string)

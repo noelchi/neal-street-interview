@@ -8,9 +8,9 @@ This project implements a production-shaped dev slice for the `rewards` web tier
 - Compute: Amazon Linux EC2 instances in protected subnets.
 - Scale path: Auto Scaling Group with desired capacity set to 1 for dev.
 - Configuration: Ansible over AWS Systems Manager.
-- Secret source: AWS SSM Parameter Store SecureString, provisioned by Terraform from a sensitive input variable.
+- Secret source: AWS SSM Parameter Store SecureString, provisioned outside the repo.
 - Observability: CloudWatch alarms for ALB target health and EC2 CPU load.
-- Delivery: GitHub Actions plan on PR and manual staged dev operations.
+- Delivery: GitHub Actions plan on PR and automatic dev rollout on `main`.
 
 ## AWS Design
 
@@ -34,7 +34,7 @@ The app is a minimal Python HTTP service managed by systemd. It serves:
 {"service":"rewards","status":"ok","commit":"","region":""}
 ```
 
-The service requires `APP_SECRET` at startup but never returns it from the health endpoint. Terraform creates the SSM SecureString from a sensitive variable, and Ansible consumes it without exposing the value in task output.
+The service requires `APP_SECRET` at startup but never returns it from the health endpoint. The SSM SecureString is created outside source control, and Ansible consumes it without exposing the value in task output.
 
 For a larger service, I would replace the static Python handler with the real application package and keep the same systemd, secret, and ALB patterns.
 
@@ -46,7 +46,7 @@ The playbook:
 
 - Creates an unprivileged service user.
 - Installs the app under `/opt/rewards`.
-- Reads Terraform-managed `/rewards/dev/APP_SECRET` from SSM Parameter Store.
+- Reads `/rewards/dev/APP_SECRET` from SSM Parameter Store.
 - Writes a systemd environment file with the secret and deployment metadata.
 - Enables and starts the service.
 - Applies a lightweight Linux baseline through sysctl settings and restrictive file permissions.
@@ -89,6 +89,8 @@ Manual workflow dispatch stages:
 - `apply`: apply Terraform to dev.
 - `configure`: run the Ansible playbook against discovered dev instances.
 
+Merges to `main` run `apply` and then `configure` automatically for dev.
+
 The workflow pins Terraform to `1.10.0` because the S3 backend uses native lockfile locking. It uses GitHub OIDC to assume an AWS role. Dev and prod credentials should be separate roles with separate trust and permission boundaries.
 
 ## Promotion to Prod
@@ -115,7 +117,7 @@ Single-region, lightweight dev infrastructure keeps the assignment focused and l
 
 Skipping NAT Gateway reduces cost but means hosts cannot freely download packages from the internet. The app deliberately uses Python already available on Amazon Linux and Ansible copies the service files directly. In production, I would use a private artifact repository, VPC endpoints, or controlled NAT egress depending on compliance and operational needs.
 
-The demo stores the secret in Terraform state and in a systemd environment file on the instance after Ansible retrieves it. That is acceptable for this exercise, but for stronger production posture I would use a secrets workflow that avoids long-lived plaintext in Terraform state and retrieves the value at runtime with rotation and tighter audit controls.
+The demo stores the secret in a systemd environment file on the instance after Ansible retrieves it. That is acceptable for this exercise, but for stronger production posture I would retrieve the secret at runtime with rotation and tighter audit controls.
 
 ## Demo Outline
 

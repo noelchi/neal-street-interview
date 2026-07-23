@@ -25,15 +25,20 @@ Ansible connects to the instances through AWS Systems Manager, so no SSH ingress
 - AWS Session Manager plugin installed locally for Ansible SSM connections.
 - An S3 bucket for remote Terraform state, if using the team backend described in `SOLUTION.md`.
 
-## Application Secret
+## One-Time Secret Setup
 
-Terraform creates `/rewards/dev/APP_SECRET` as an SSM SecureString. Provide the value as a sensitive Terraform variable instead of committing it to a `.tfvars` file:
+Create the application secret outside the repo before running Ansible:
 
 ```bash
-export TF_VAR_app_secret_value="$(openssl rand -base64 32)"
+aws ssm put-parameter \
+  --name /rewards/dev/APP_SECRET \
+  --type SecureString \
+  --value "$(openssl rand -base64 32)" \
+  --overwrite \
+  --region af-south-1
 ```
 
-The value is consumed by Ansible at deploy time and written into the systemd environment for the app. The health endpoint does not expose it. Because Terraform manages the SecureString, the secret value is also stored in Terraform state; keep the state bucket access tightly restricted.
+The value is consumed by Ansible at deploy time and written into the systemd environment for the app. The health endpoint does not expose it.
 
 ## Local Dev Deployment
 
@@ -42,7 +47,6 @@ From the repository root:
 ```bash
 cd terraform
 cp dev.tfvars.example dev.tfvars
-export TF_VAR_app_secret_value="$(openssl rand -base64 32)"
 terraform init
 terraform fmt -recursive
 terraform validate
@@ -84,7 +88,11 @@ cd terraform
 terraform destroy -var-file=dev.tfvars
 ```
 
-Terraform manages the SSM parameter, so `terraform destroy` removes it during cleanup.
+The SSM parameter is intentionally created outside Terraform. Delete it separately when the demo is complete:
+
+```bash
+aws ssm delete-parameter --name /rewards/dev/APP_SECRET --region af-south-1
+```
 
 ## CI/CD
 
@@ -92,11 +100,10 @@ The GitHub Actions workflow in `.github/workflows/dev.yml` expects:
 
 - `vars.AWS_REGION`, for example `af-south-1`.
 - `secrets.DEV_AWS_ROLE_ARN`, an IAM role GitHub can assume through OIDC.
-- `secrets.DEV_APP_SECRET`, the value Terraform writes to `/rewards/dev/APP_SECRET`.
 
-Pull requests run Terraform checks, initialize the checked-in S3 backend, produce a dev plan, and run Ansible syntax validation.
+Pull requests run Terraform checks, initialize the checked-in S3 backend, write the dev plan to the workflow summary, and run Ansible syntax validation.
 
-Manual workflow runs support staged operations:
+Merges to `main` apply Terraform to dev and then run Ansible against the discovered dev instances. Manual workflow runs are also available for staged operations:
 
 - `plan`: run the same dev plan checks outside a pull request.
 - `import-existing`: import deterministic pre-existing dev resources into the S3-backed Terraform state.
