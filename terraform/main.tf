@@ -484,3 +484,5 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu" {
     AutoScalingGroupName = aws_autoscaling_group.web.name
   }
 }
+
+# test web app 1
