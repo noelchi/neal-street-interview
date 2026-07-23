@@ -198,6 +198,34 @@ jobs:
             fi
           }
 
+          import_route_table_association() {
+            local address="$1"
+            local subnet_id="$2"
+            local route_table_id="$3"
+
+            if is_missing "$subnet_id" || is_missing "$route_table_id"; then
+              echo "Skipping $address because no existing route table association was found"
+              return 0
+            fi
+
+            if terraform state show "$address" >/dev/null 2>&1; then
+              local current_subnet_id
+              local current_route_table_id
+              current_subnet_id="$(terraform state show -no-color "$address" | awk -F' = ' '$1 ~ /^[[:space:]]*subnet_id$/ { print $2; exit }')"
+              current_route_table_id="$(terraform state show -no-color "$address" | awk -F' = ' '$1 ~ /^[[:space:]]*route_table_id$/ { print $2; exit }')"
+
+              if [ "$current_subnet_id" = "$subnet_id" ] && [ "$current_route_table_id" = "$route_table_id" ]; then
+                echo "$address already exists in Terraform state with expected subnet and route table"
+              else
+                echo "$address exists in Terraform state with subnet $current_subnet_id and route table $current_route_table_id; re-importing"
+                terraform state rm "$address"
+                terraform import -input=false -var-file=dev.tfvars.example "$address" "${subnet_id}/${route_table_id}"
+              fi
+            else
+              terraform import -input=false -var-file=dev.tfvars.example "$address" "${subnet_id}/${route_table_id}"
+            fi
+          }
+
           ALB_ARN="$(aws elbv2 describe-load-balancers --names "$NAME" --query 'LoadBalancers[0].LoadBalancerArn' --output text)"
           TARGET_GROUP_ARN="$(aws elbv2 describe-target-groups --names "$NAME" --query 'TargetGroups[0].TargetGroupArn' --output text)"
           VPC_ID="$(aws elbv2 describe-target-groups --target-group-arns "$TARGET_GROUP_ARN" --query 'TargetGroups[0].VpcId' --output text)"
@@ -215,10 +243,6 @@ jobs:
           PRIVATE_SUBNET_2="$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" "Name=cidr-block,Values=10.40.11.0/24" --query 'Subnets[0].SubnetId' --output text)"
           PUBLIC_ROUTE_TABLE_ID="$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${NAME}-public" --query 'RouteTables[0].RouteTableId' --output text)"
           PRIVATE_ROUTE_TABLE_ID="$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${NAME}-private" --query 'RouteTables[0].RouteTableId' --output text)"
-          PUBLIC_ASSOC_1="$(aws ec2 describe-route-tables --route-table-ids "$PUBLIC_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PUBLIC_SUBNET_1}'].RouteTableAssociationId | [0]" --output text)"
-          PUBLIC_ASSOC_2="$(aws ec2 describe-route-tables --route-table-ids "$PUBLIC_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PUBLIC_SUBNET_2}'].RouteTableAssociationId | [0]" --output text)"
-          PRIVATE_ASSOC_1="$(aws ec2 describe-route-tables --route-table-ids "$PRIVATE_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PRIVATE_SUBNET_1}'].RouteTableAssociationId | [0]" --output text)"
-          PRIVATE_ASSOC_2="$(aws ec2 describe-route-tables --route-table-ids "$PRIVATE_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PRIVATE_SUBNET_2}'].RouteTableAssociationId | [0]" --output text)"
           WEB_SG_ID="$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${NAME}-web" --query 'SecurityGroups[0].GroupId' --output text)"
           VPCE_SG_ID="$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${NAME}-vpce" --query 'SecurityGroups[0].GroupId' --output text)"
           SSM_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ssm" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
@@ -236,10 +260,10 @@ jobs:
           import_if_missing 'aws_subnet.private[1]' "$PRIVATE_SUBNET_2"
           import_if_missing aws_route_table.public "$PUBLIC_ROUTE_TABLE_ID"
           import_if_missing aws_route_table.private "$PRIVATE_ROUTE_TABLE_ID"
-          import_if_missing 'aws_route_table_association.public[0]' "$PUBLIC_ASSOC_1"
-          import_if_missing 'aws_route_table_association.public[1]' "$PUBLIC_ASSOC_2"
-          import_if_missing 'aws_route_table_association.private[0]' "$PRIVATE_ASSOC_1"
-          import_if_missing 'aws_route_table_association.private[1]' "$PRIVATE_ASSOC_2"
+          import_route_table_association 'aws_route_table_association.public[0]' "$PUBLIC_SUBNET_1" "$PUBLIC_ROUTE_TABLE_ID"
+          import_route_table_association 'aws_route_table_association.public[1]' "$PUBLIC_SUBNET_2" "$PUBLIC_ROUTE_TABLE_ID"
+          import_route_table_association 'aws_route_table_association.private[0]' "$PRIVATE_SUBNET_1" "$PRIVATE_ROUTE_TABLE_ID"
+          import_route_table_association 'aws_route_table_association.private[1]' "$PRIVATE_SUBNET_2" "$PRIVATE_ROUTE_TABLE_ID"
           import_if_missing aws_security_group.alb "$ALB_SG_ID"
           import_if_missing aws_security_group.web "$WEB_SG_ID"
           import_if_missing aws_security_group.vpce "$VPCE_SG_ID"
