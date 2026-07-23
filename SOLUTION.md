@@ -85,7 +85,7 @@ Pull requests to `main`:
 Manual workflow dispatch stages:
 
 - `plan`: run the dev Terraform plan and Ansible syntax checks outside a pull request.
-- `import-existing`: import selected pre-existing dev resources into the S3-backed Terraform state.
+- `import-existing`: import deterministic pre-existing dev resources into the S3-backed Terraform state.
 - `apply`: apply Terraform to dev.
 - `configure`: run the Ansible playbook against discovered dev instances.
 

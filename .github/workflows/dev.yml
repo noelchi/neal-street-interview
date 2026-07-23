@@ -153,24 +153,86 @@ jobs:
         run: |
           set -euo pipefail
 
+          NAME="rewards-dev"
+          REGION="${AWS_REGION}"
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          SSM_BUCKET="${NAME}-ansible-ssm-${ACCOUNT_ID}-${REGION}"
+          SSM_POLICY_ARN="arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+
           import_if_missing() {
             local address="$1"
             local id="$2"
 
+            if [ -z "$id" ] || [ "$id" = "None" ] || [ "$id" = "null" ]; then
+              echo "Skipping $address because no existing resource was found"
+              return 0
+            fi
+
             if terraform state show "$address" >/dev/null 2>&1; then
               echo "$address already exists in Terraform state"
             else
-              terraform import -var-file=dev.tfvars.example "$address" "$id"
+              terraform import -input=false -var-file=dev.tfvars.example "$address" "$id"
             fi
           }
 
-          ALB_ARN="$(aws elbv2 describe-load-balancers --names rewards-dev --query 'LoadBalancers[0].LoadBalancerArn' --output text)"
-          TARGET_GROUP_ARN="$(aws elbv2 describe-target-groups --names rewards-dev --query 'TargetGroups[0].TargetGroupArn' --output text)"
+          VPC_ID="$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=${NAME}" --query 'Vpcs[0].VpcId' --output text)"
+          IGW_ID="$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=${VPC_ID}" --query 'InternetGateways[0].InternetGatewayId' --output text)"
+          PUBLIC_SUBNET_1="$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" "Name=cidr-block,Values=10.40.0.0/24" --query 'Subnets[0].SubnetId' --output text)"
+          PUBLIC_SUBNET_2="$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" "Name=cidr-block,Values=10.40.1.0/24" --query 'Subnets[0].SubnetId' --output text)"
+          PRIVATE_SUBNET_1="$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" "Name=cidr-block,Values=10.40.10.0/24" --query 'Subnets[0].SubnetId' --output text)"
+          PRIVATE_SUBNET_2="$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" "Name=cidr-block,Values=10.40.11.0/24" --query 'Subnets[0].SubnetId' --output text)"
+          PUBLIC_ROUTE_TABLE_ID="$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${NAME}-public" --query 'RouteTables[0].RouteTableId' --output text)"
+          PRIVATE_ROUTE_TABLE_ID="$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${NAME}-private" --query 'RouteTables[0].RouteTableId' --output text)"
+          PUBLIC_ASSOC_1="$(aws ec2 describe-route-tables --route-table-ids "$PUBLIC_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PUBLIC_SUBNET_1}'].RouteTableAssociationId | [0]" --output text)"
+          PUBLIC_ASSOC_2="$(aws ec2 describe-route-tables --route-table-ids "$PUBLIC_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PUBLIC_SUBNET_2}'].RouteTableAssociationId | [0]" --output text)"
+          PRIVATE_ASSOC_1="$(aws ec2 describe-route-tables --route-table-ids "$PRIVATE_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PRIVATE_SUBNET_1}'].RouteTableAssociationId | [0]" --output text)"
+          PRIVATE_ASSOC_2="$(aws ec2 describe-route-tables --route-table-ids "$PRIVATE_ROUTE_TABLE_ID" --query "RouteTables[0].Associations[?SubnetId=='${PRIVATE_SUBNET_2}'].RouteTableAssociationId | [0]" --output text)"
+          ALB_SG_ID="$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${NAME}-alb" --query 'SecurityGroups[0].GroupId' --output text)"
+          WEB_SG_ID="$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${NAME}-web" --query 'SecurityGroups[0].GroupId' --output text)"
+          VPCE_SG_ID="$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${NAME}-vpce" --query 'SecurityGroups[0].GroupId' --output text)"
+          SSM_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ssm" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
+          SSM_MESSAGES_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ssmmessages" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
+          EC2_MESSAGES_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.ec2messages" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
+          S3_VPCE_ID="$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=com.amazonaws.${REGION}.s3" --query 'VpcEndpoints[0].VpcEndpointId' --output text)"
+          ALB_ARN="$(aws elbv2 describe-load-balancers --names "$NAME" --query 'LoadBalancers[0].LoadBalancerArn' --output text)"
+          TARGET_GROUP_ARN="$(aws elbv2 describe-target-groups --names "$NAME" --query 'TargetGroups[0].TargetGroupArn' --output text)"
+          LISTENER_ARN="$(aws elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" --query 'Listeners[?Port==`80`].ListenerArn | [0]' --output text)"
+          LAUNCH_TEMPLATE_ID="$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "${NAME}-web" --query 'AutoScalingGroups[0].LaunchTemplate.LaunchTemplateId' --output text)"
 
-          import_if_missing aws_s3_bucket.ansible_ssm rewards-dev-ansible-ssm-487750847994-af-south-1
-          import_if_missing aws_iam_role.web rewards-dev-web
+          import_if_missing aws_vpc.this "$VPC_ID"
+          import_if_missing aws_internet_gateway.this "$IGW_ID"
+          import_if_missing 'aws_subnet.public[0]' "$PUBLIC_SUBNET_1"
+          import_if_missing 'aws_subnet.public[1]' "$PUBLIC_SUBNET_2"
+          import_if_missing 'aws_subnet.private[0]' "$PRIVATE_SUBNET_1"
+          import_if_missing 'aws_subnet.private[1]' "$PRIVATE_SUBNET_2"
+          import_if_missing aws_route_table.public "$PUBLIC_ROUTE_TABLE_ID"
+          import_if_missing aws_route_table.private "$PRIVATE_ROUTE_TABLE_ID"
+          import_if_missing 'aws_route_table_association.public[0]' "$PUBLIC_ASSOC_1"
+          import_if_missing 'aws_route_table_association.public[1]' "$PUBLIC_ASSOC_2"
+          import_if_missing 'aws_route_table_association.private[0]' "$PRIVATE_ASSOC_1"
+          import_if_missing 'aws_route_table_association.private[1]' "$PRIVATE_ASSOC_2"
+          import_if_missing aws_security_group.alb "$ALB_SG_ID"
+          import_if_missing aws_security_group.web "$WEB_SG_ID"
+          import_if_missing aws_security_group.vpce "$VPCE_SG_ID"
+          import_if_missing 'aws_vpc_endpoint.ssm["ssm"]' "$SSM_VPCE_ID"
+          import_if_missing 'aws_vpc_endpoint.ssm["ssmmessages"]' "$SSM_MESSAGES_VPCE_ID"
+          import_if_missing 'aws_vpc_endpoint.ssm["ec2messages"]' "$EC2_MESSAGES_VPCE_ID"
+          import_if_missing aws_vpc_endpoint.s3 "$S3_VPCE_ID"
+          import_if_missing aws_s3_bucket.ansible_ssm "$SSM_BUCKET"
+          import_if_missing aws_s3_bucket_public_access_block.ansible_ssm "$SSM_BUCKET"
+          import_if_missing aws_s3_bucket_server_side_encryption_configuration.ansible_ssm "$SSM_BUCKET"
+          import_if_missing aws_s3_bucket_lifecycle_configuration.ansible_ssm "$SSM_BUCKET"
+          import_if_missing aws_iam_role.web "${NAME}-web"
+          import_if_missing aws_iam_role_policy_attachment.ssm_managed_instance "${NAME}-web/${SSM_POLICY_ARN}"
+          import_if_missing aws_iam_role_policy.app_secret "${NAME}-web:${NAME}-app-secret"
+          import_if_missing aws_iam_instance_profile.web "${NAME}-web"
           import_if_missing aws_lb.web "$ALB_ARN"
           import_if_missing aws_lb_target_group.web "$TARGET_GROUP_ARN"
+          import_if_missing aws_lb_listener.http "$LISTENER_ARN"
+          import_if_missing aws_launch_template.web "$LAUNCH_TEMPLATE_ID"
+          import_if_missing aws_autoscaling_group.web "${NAME}-web"
+          import_if_missing aws_cloudwatch_metric_alarm.unhealthy_targets "${NAME}-unhealthy-targets"
+          import_if_missing aws_cloudwatch_metric_alarm.high_cpu "${NAME}-high-cpu"
 
   configure-dev:
     name: Configure dev

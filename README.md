@@ -106,6 +106,6 @@ Pull requests run Terraform checks, initialize the checked-in S3 backend, produc
 Manual workflow runs support staged operations:
 
 - `plan`: run the same dev plan checks outside a pull request.
-- `import-existing`: import selected pre-existing dev resources into the S3-backed Terraform state.
+- `import-existing`: import deterministic pre-existing dev resources into the S3-backed Terraform state.
 - `apply`: apply Terraform to dev.
 - `configure`: run Ansible against the discovered dev instances.
