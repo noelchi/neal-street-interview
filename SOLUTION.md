@@ -10,7 +10,7 @@ This project implements a production-shaped dev slice for the `rewards` web tier
 - Configuration: Ansible over AWS Systems Manager.
 - Secret source: AWS SSM Parameter Store SecureString, provisioned outside the repo.
 - Observability: CloudWatch alarms for ALB target health and EC2 CPU load.
-- Delivery: GitHub Actions plan on PR and apply/configure on `main`.
+- Delivery: GitHub Actions plan on PR and manual staged dev operations.
 
 ## AWS Design
 
@@ -59,7 +59,7 @@ For local experimentation, Terraform can use local state. For a small team, the 
 - S3 lockfiles prevent overlapping applies without requiring a DynamoDB table.
 - Access can be controlled through IAM.
 
-The trade-off is that the backend bucket must be bootstrapped once before the main stack can use it. `terraform/backend.tf.example` shows the intended backend configuration.
+The trade-off is that the backend bucket must be bootstrapped once before the main stack can use it. `terraform/versions.tf` contains the backend configuration.
 
 ## Observability Choice
 
@@ -82,12 +82,14 @@ Pull requests to `main`:
 - Run a dev Terraform plan.
 - Run Ansible syntax checks.
 
-Merges to `main`:
+Manual workflow dispatch stages:
 
-- Apply Terraform to dev.
-- Run the Ansible playbook against discovered dev instances.
+- `plan`: run the dev Terraform plan and Ansible syntax checks outside a pull request.
+- `import-existing`: import selected pre-existing dev resources into the S3-backed Terraform state.
+- `apply`: apply Terraform to dev.
+- `configure`: run the Ansible playbook against discovered dev instances.
 
-The workflow uses GitHub OIDC to assume an AWS role. Dev and prod credentials should be separate roles with separate trust and permission boundaries.
+The workflow pins Terraform to `1.10.0` because the S3 backend uses native lockfile locking. It uses GitHub OIDC to assume an AWS role. Dev and prod credentials should be separate roles with separate trust and permission boundaries.
 
 ## Promotion to Prod
 

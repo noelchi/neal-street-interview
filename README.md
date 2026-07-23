@@ -101,4 +101,11 @@ The GitHub Actions workflow in `.github/workflows/dev.yml` expects:
 - `vars.AWS_REGION`, for example `af-south-1`.
 - `secrets.DEV_AWS_ROLE_ARN`, an IAM role GitHub can assume through OIDC.
 
-Pull requests run Terraform checks and produce a dev plan. Merges to `main` apply Terraform to dev and run Ansible.
+Pull requests run Terraform checks, initialize the checked-in S3 backend, produce a dev plan, and run Ansible syntax validation.
+
+Manual workflow runs support staged operations:
+
+- `plan`: run the same dev plan checks outside a pull request.
+- `import-existing`: import selected pre-existing dev resources into the S3-backed Terraform state.
+- `apply`: apply Terraform to dev.
+- `configure`: run Ansible against the discovered dev instances.

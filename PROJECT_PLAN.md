@@ -34,8 +34,8 @@ Status: complete.
 
 - Run Terraform formatting, validation, and plan on pull requests.
 - Run Ansible syntax validation on pull requests.
-- Apply Terraform to dev after merges to `main`.
-- Run Ansible after Terraform apply.
+- Apply Terraform to dev through a manual workflow stage.
+- Run Ansible through a manual workflow stage after Terraform apply.
 - Prevent overlapping dev deployments.
 
 Status: complete.
@@ -47,4 +47,3 @@ Status: complete.
 - Record a 5-10 minute walkthrough showing the repository, plan/apply, Ansible run, health endpoint, alarms, and cleanup.
 
 Status: in progress.
-
