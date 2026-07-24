@@ -1,0 +1,133 @@
+<mxfile host="app.diagrams.net" agent="Codex">
+  <diagram id="rewards-dev-aws-architecture" name="Rewards Dev AWS Architecture">
+    <mxGraphModel dx="1664" dy="929" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=26;fontStyle=1;fontColor=#232F3E;align=center;verticalAlign=middle;" value="Rewards Dev Web Tier - AWS Architecture" vertex="1">
+          <mxGeometry height="40" width="840" x="430" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="github" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#545B64;fontColor=#232F3E;fontStyle=1;arcSize=8;" value="GitHub Actions&#xa;PR: fmt, validate, plan summary&#xa;main: apply + configure" vertex="1">
+          <mxGeometry height="90" width="250" x="70" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="terraform" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAEDED;strokeColor=#545B64;fontColor=#232F3E;fontStyle=1;arcSize=8;" value="Terraform" vertex="1">
+          <mxGeometry height="55" width="165" x="380" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="ansible" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAEDED;strokeColor=#545B64;fontColor=#232F3E;fontStyle=1;arcSize=8;" value="Ansible over SSM" vertex="1">
+          <mxGeometry height="55" width="165" x="380" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-state" parent="1" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.s3;" value="S3 backend&#xa;terraform.tfstate + lockfile" vertex="1">
+          <mxGeometry height="88" width="88" x="610" y="75" as="geometry" />
+        </mxCell>
+        <mxCell id="ssm-secret" parent="1" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D86613;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.parameter_store;" value="Parameter Store&#xa;/rewards/dev/APP_SECRET&#xa;outside repo" vertex="1">
+          <mxGeometry height="88" width="88" x="610" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="iam" parent="1" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.iam;" value="IAM Role + Instance Profile&#xa;SSM core, GetParameter, S3 transfer" vertex="1">
+          <mxGeometry height="92" width="92" x="805" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="cw" parent="1" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D86613;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.cloudwatch;" value="CloudWatch Alarms&#xa;UnHealthyHostCount&#xa;CPUUtilization" vertex="1">
+          <mxGeometry height="92" width="92" x="1045" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="ansible-bucket" parent="1" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.s3;" value="S3 transfer bucket&#xa;Ansible module staging&#xa;7 day lifecycle" vertex="1">
+          <mxGeometry height="92" width="92" x="1285" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="users" parent="1" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#147EBA;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.users;" value="Internet users&#xa;GET /health" vertex="1">
+          <mxGeometry height="90" width="90" x="80" y="505" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-cloud" parent="1" style="swimlane;html=1;whiteSpace=wrap;rounded=0;startSize=34;fillColor=#FFFFFF;strokeColor=#FF9900;fontColor=#232F3E;fontStyle=1;" value="AWS Region: af-south-1" vertex="1">
+          <mxGeometry height="620" width="1330" x="260" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="vpc" parent="aws-cloud" style="swimlane;html=1;whiteSpace=wrap;rounded=0;startSize=34;fillColor=#F2F8FD;strokeColor=#147EBA;fontColor=#232F3E;fontStyle=1;" value="Amazon VPC rewards-dev - 10.40.0.0/16" vertex="1">
+          <mxGeometry height="520" width="1250" x="40" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="igw" parent="vpc" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.internet_gateway;" value="Internet Gateway" vertex="1">
+          <mxGeometry height="78" width="78" x="55" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="public-a" parent="vpc" style="swimlane;html=1;whiteSpace=wrap;rounded=0;startSize=30;fillColor=#E9F3FF;strokeColor=#147EBA;fontColor=#232F3E;" value="Public subnet AZ1&#xa;10.40.0.0/24" vertex="1">
+          <mxGeometry height="170" width="380" x="195" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="alb" parent="public-a" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.application_load_balancer;" value="Application Load Balancer&#xa;HTTP listener :80&#xa;SG: rewards-dev-alb" vertex="1">
+          <mxGeometry height="92" width="92" x="135" y="42" as="geometry" />
+        </mxCell>
+        <mxCell id="public-b" parent="vpc" style="swimlane;html=1;whiteSpace=wrap;rounded=0;startSize=30;fillColor=#E9F3FF;strokeColor=#147EBA;fontColor=#232F3E;" value="Public subnet AZ2&#xa;10.40.1.0/24" vertex="1">
+          <mxGeometry height="170" width="380" x="195" y="295" as="geometry" />
+        </mxCell>
+        <mxCell id="alb-node" parent="public-b" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.application_load_balancer;" value="ALB node" vertex="1">
+          <mxGeometry height="78" width="78" x="145" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="private-a" parent="vpc" style="swimlane;html=1;whiteSpace=wrap;rounded=0;startSize=30;fillColor=#EAF6E8;strokeColor=#7AA116;fontColor=#232F3E;" value="Protected subnet AZ1&#xa;10.40.10.0/24" vertex="1">
+          <mxGeometry height="170" width="410" x="700" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="asg" parent="private-a" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D86613;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.auto_scaling;" value="Auto Scaling Group&#xa;desired=1 min=1 max=2" vertex="1">
+          <mxGeometry height="82" width="82" x="60" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2" parent="private-a" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D86613;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.ec2;" value="EC2 Amazon Linux&#xa;rewards.service :8080&#xa;no public IP&#xa;SG: rewards-dev-web" vertex="1">
+          <mxGeometry height="92" width="92" x="255" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="private-b" parent="vpc" style="swimlane;html=1;whiteSpace=wrap;rounded=0;startSize=30;fillColor=#EAF6E8;strokeColor=#7AA116;fontColor=#232F3E;" value="Protected subnet AZ2&#xa;10.40.11.0/24" vertex="1">
+          <mxGeometry height="170" width="410" x="700" y="295" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2-scaleout" parent="private-b" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D86613;strokeColor=none;dashed=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.ec2;" value="Optional scale-out EC2&#xa;when desired_capacity increases" vertex="1">
+          <mxGeometry height="88" width="88" x="160" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ssm-vpce" parent="vpc" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D86613;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.vpc_endpoint;" value="Interface VPC Endpoints&#xa;ssm, ssmmessages, ec2messages&#xa;SG: rewards-dev-vpce" vertex="1">
+          <mxGeometry height="92" width="92" x="730" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="s3-vpce" parent="vpc" style="sketch=0;points=[];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.vpc_endpoint;" value="S3 Gateway Endpoint&#xa;private route table" vertex="1">
+          <mxGeometry height="92" width="92" x="980" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-users-igw" edge="1" parent="1" source="users" style="endArrow=block;html=1;rounded=0;strokeColor=#147EBA;strokeWidth=2;" target="igw" value="HTTP :80">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-igw-alb" edge="1" parent="1" source="igw" style="endArrow=block;html=1;rounded=0;strokeColor=#147EBA;strokeWidth=2;" target="alb" value="public entrypoint">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-alb-ec2" edge="1" parent="1" source="alb" style="endArrow=block;html=1;rounded=0;strokeColor=#7AA116;strokeWidth=2;" target="ec2" value="forward :8080">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-alb-scale" edge="1" parent="1" source="alb-node" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#7AA116;" target="ec2-scaleout" value="scale path">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-github-tf" edge="1" parent="1" source="github" style="endArrow=block;html=1;rounded=0;strokeColor=#6A4BBC;strokeWidth=2;" target="terraform" value="plan/apply">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-github-ansible" edge="1" parent="1" source="github" style="endArrow=block;html=1;rounded=0;strokeColor=#D13212;strokeWidth=2;" target="ansible" value="configure">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-tf-state" edge="1" parent="1" source="terraform" style="endArrow=block;html=1;rounded=0;strokeColor=#7AA116;" target="tf-state" value="remote state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-tf-vpc" edge="1" parent="1" source="terraform" style="endArrow=block;html=1;rounded=0;strokeColor=#6A4BBC;" target="aws-cloud" value="provisions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-ansible-vpce" edge="1" parent="1" source="ansible" style="endArrow=block;html=1;rounded=0;strokeColor=#D13212;" target="ssm-vpce" value="SSM Session Manager">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-vpce-ec2" edge="1" parent="1" source="ssm-vpce" style="endArrow=block;html=1;rounded=0;strokeColor=#D86613;" target="ec2" value="private management">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-ansible-secret" edge="1" parent="1" source="ansible" style="endArrow=block;html=1;rounded=0;strokeColor=#D86613;" target="ssm-secret" value="GetParameter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-iam-ec2" edge="1" parent="1" source="iam" style="endArrow=block;html=1;rounded=0;strokeColor=#DD344C;" target="ec2" value="attached role">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-ansible-bucket" edge="1" parent="1" source="ansible" style="endArrow=block;html=1;rounded=0;strokeColor=#7AA116;" target="ansible-bucket" value="module transfer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-ec2-s3vpce" edge="1" parent="1" source="ec2" style="endArrow=block;html=1;rounded=0;strokeColor=#7AA116;" target="s3-vpce" value="private S3 access">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-s3vpce-bucket" edge="1" parent="1" source="s3-vpce" style="endArrow=block;html=1;rounded=0;strokeColor=#7AA116;" target="ansible-bucket" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-cw-alb" edge="1" parent="1" source="cw" style="endArrow=block;html=1;rounded=0;strokeColor=#D86613;" target="alb" value="availability">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-cw-asg" edge="1" parent="1" source="cw" style="endArrow=block;html=1;rounded=0;strokeColor=#D86613;" target="asg" value="load">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
