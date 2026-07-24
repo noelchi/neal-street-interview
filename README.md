@@ -16,6 +16,8 @@ Public traffic enters through an internet-facing AWS Application Load Balancer. 
 
 Ansible connects to the instances through AWS Systems Manager, so no SSH ingress is required.
 
+The editable architecture diagram is in `docs/architecture.drawio`.
+
 ## Prerequisites
 
 - AWS account access with permission to create VPC, EC2, IAM, SSM Parameter Store, ALB, Auto Scaling, and CloudWatch resources.
@@ -23,7 +25,7 @@ Ansible connects to the instances through AWS Systems Manager, so no SSH ingress
 - Python 3.11+.
 - Ansible with the `amazon.aws` collection.
 - AWS Session Manager plugin installed locally for Ansible SSM connections.
-- An S3 bucket for remote Terraform state, if using the team backend described in `SOLUTION.md`.
+- An S3 bucket for remote Terraform state, if using the team backend described in `docs/SOLUTION.md`.
 
 ## One-Time Secret Setup
 
