@@ -126,7 +126,7 @@ resource "aws_security_group" "alb" {
   }
 
   egress {
-    description = "App traffic to protected subnets - test reward"
+    description = "App traffic to protected subnets"
     from_port   = var.app_port
     to_port     = var.app_port
     protocol    = "tcp"
